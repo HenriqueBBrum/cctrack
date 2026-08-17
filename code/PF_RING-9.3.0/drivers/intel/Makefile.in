@@ -1,0 +1,81 @@
+E1000E=e1000e/e1000e-@E1000E_VERSION@-zc
+IGB=igb/igb-@IGB_VERSION@-zc
+IXGBE=ixgbe/ixgbe-@IXGBE_VERSION@-zc
+IXGBEVF=ixgbevf/ixgbevf-@IXGBEVF_VERSION@-zc
+I40E=i40e/i40e-@I40E_VERSION@-zc
+ICE=ice/ice-@ICE_VERSION@-zc
+IAVF=iavf/iavf-@IAVF_VERSION@-zc
+
+all:
+ifeq (@HAVE_E1000E@,y)
+	cd $(E1000E); make
+endif
+	cd $(IGB); make
+	cd $(IXGBE); make
+	cd $(IXGBEVF); make
+	cd $(I40E); make
+ifeq (@HAVE_ICE@,y)
+	cd $(ICE); make
+endif
+	cd $(IAVF); make
+
+clean:
+ifeq (@HAVE_E1000E@,y)
+	cd $(E1000E); make clean
+endif
+	cd $(IGB); make clean
+	cd $(IXGBE); make clean
+	cd $(IXGBEVF); make clean
+	cd $(I40E); make clean
+ifeq (@HAVE_ICE@,y)
+	cd $(ICE); make clean
+endif
+	cd $(IAVF); make clean
+	-/bin/rm *.deb *.rpm
+
+cleanup:
+	sudo rm -rf /var/lib/dkms/*-zc  /lib/modules/`uname -r`/extra/*-zc.ko
+
+dkms-deb-virtual:
+	/bin/rm -rf tmp
+	mkdir tmp
+	cp -r pfring-drivers-zc-dkms tmp
+	find tmp -name .git|xargs /bin/rm -rf	
+	cd tmp; dpkg-deb -b pfring-drivers-zc-dkms .; mv *.deb ..
+
+dkms-deb: cleanup dkms-deb-virtual
+ifeq (@HAVE_E1000E@,y)
+	sudo make -f Makefile.dkms.e1000e deb
+	cp /var/lib/dkms/e1000e-zc/*/deb/*.deb .
+endif
+	sudo make -f Makefile.dkms.igb deb
+	cp /var/lib/dkms/igb-zc/*/deb/*.deb .
+	sudo make -f Makefile.dkms.ixgbe deb
+	cp /var/lib/dkms/ixgbe-zc/*/deb/*.deb .
+	sudo make -f Makefile.dkms.ixgbevf deb
+	cp /var/lib/dkms/ixgbevf-zc/*/deb/*.deb .
+	sudo make -f Makefile.dkms.i40e deb
+	cp /var/lib/dkms/i40e-zc/*/deb/*.deb .
+	sudo make -f Makefile.dkms.iavf deb
+	cp /var/lib/dkms/iavf-zc/*/deb/*.deb .
+ifeq (@HAVE_ICE@,y)
+	sudo make -f Makefile.dkms.ice deb
+	cp /var/lib/dkms/ice-zc/*/deb/*.deb .
+endif
+
+dkms-rpm: cleanup dkms-rpm-virtual
+ifeq (@HAVE_E1000E@,y)
+	sudo make -f Makefile.dkms.e1000e rpm
+endif
+	sudo make -f Makefile.dkms.igb rpm
+	sudo make -f Makefile.dkms.ixgbe rpm
+	sudo make -f Makefile.dkms.ixgbevf rpm
+	sudo make -f Makefile.dkms.i40e rpm
+	sudo make -f Makefile.dkms.iavf rpm
+ifeq (@HAVE_ICE@,y)
+	sudo make -f Makefile.dkms.ice rpm
+endif
+
+dkms-rpm-virtual:
+	rpmbuild -ba pfring-zc-rpm.spec
+	cp ~/rpmbuild/RPMS/noarch/pfring-drivers-zc-dkms-*.noarch.rpm .

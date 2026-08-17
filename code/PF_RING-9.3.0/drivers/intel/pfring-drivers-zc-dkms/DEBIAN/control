@@ -1,0 +1,8 @@
+Section: misc
+Priority: optional
+Maintainer: Luca Deri <deri@ntop.org>
+Version: 9.3.0-1
+Package: pfring-drivers-zc-dkms
+Architecture: all
+Depends: pfring-dkms (=9.3.0.1), igb-zc-dkms, ixgbe-zc-dkms, i40e-zc-dkms, ice-zc-dkms
+Description: Virtual package for ZC drivers in DKMS format (http://www.ntop.org/pf_ring/).

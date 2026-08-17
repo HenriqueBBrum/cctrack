@@ -1,0 +1,16 @@
+#! /bin/sh
+
+case "$1" in
+	upgrade)
+		# This is an upgrade, do not disable the services
+	;;
+	*)
+		CMDLINE=$(tr -d '\0' < /proc/1/cmdline)
+		if [ ! -z "${CMDLINE##*system*}" ] && [ ! -z "${CMDLINE##*init*}" ]; then
+			exit 0 # no init/systemd (in a container)
+		fi
+		# Run actions here
+	;;
+esac
+
+exit 0

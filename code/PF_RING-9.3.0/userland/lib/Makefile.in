@@ -1,0 +1,177 @@
+#
+# Makefile for both static and dynamic PF_RING user libraries
+#
+#
+
+BUILD_KERNEL=$(shell uname -r)
+PF_RING_KERNEL=../../kernel
+
+#
+# Search directories
+#
+INCLUDE   = -I$(PF_RING_KERNEL) @BPF_INCLUDE@
+
+#
+# Installation directories
+#
+prefix = @prefix@
+exec_prefix = @exec_prefix@
+libdir =  @libdir@
+includedir = @includedir@
+
+#
+# PF_RING ZC
+#
+PF_RING_ZC_OBJS  = @PF_RING_ZC_OBJS@
+
+#
+# PF_RING FT
+#
+PF_RING_FT_OBJS  = @PF_RING_FT_OBJS@
+
+#
+# AF_XDP
+#
+AF_XDP_OBJS  = @AF_XDP_OBJS@
+
+#
+# FIBERBLAZE
+#
+FIBERBLAZE_OBJS = @FIBERBLAZE_OBJS@
+
+#
+# NT
+#
+NT_OBJS  = @NT_OBJS@
+
+#
+# Mellanox
+#
+MLX_OBJS  = @MLX_OBJS@
+
+# nPCAP
+#
+NPCAP_OBJS  = @NPCAP_OBJS@
+
+#
+# nBPF
+#
+NBPF_HOME = ../nbpf
+NBPF_HDR = ${NBPF_HOME}/nbpf.h
+NBPF_LIB = ${NBPF_HOME}/libnbpf.a
+NBPF_OBJS = `$(AR) t ${NBPF_LIB} | grep -F .o | tr '\n' ' '`
+
+#
+# Object files
+#
+OBJS_MIN = pfring.o pfring_mod.o pfring_utils.o pfring_mod_stack.o pfring_hw_filtering.o pfring_runtime_manager.o \
+	   pfring_hw_timestamp.o pfring_mod_pcap.o pfring_device.o ${PF_RING_ZC_OBJS} \
+	   ${AF_XDP_OBJS} ${FIBERBLAZE_OBJS} ${NT_OBJS} ${MLX_OBJS} ${NPCAP_OBJS}
+
+OBJS =     ${OBJS_MIN} ${PF_RING_FT_OBJS}
+
+#
+# C compiler and flags
+#
+#
+# CROSS_COMPILE=arm-mv5sft-linux-gnueabi-
+#
+CC        = ${CROSS_COMPILE}gcc
+GCC_MAJ_VERSION=$(shell ${CC} -dumpversion | cut -f1 -d.)
+WFLAGS    = -Wall
+ifeq ($(shell test $(GCC_MAJ_VERSION) -ge 5 && echo 1), 1)
+WFLAGS += -Wno-stringop-truncation -Wno-address-of-packed-member
+endif
+
+CFLAGS_MIN = @CFLAGS@ ${WFLAGS} -fPIC ${INCLUDE} @HAVE_PF_RING_ZC@ @HAVE_AF_XDP@ @HAVE_FIBERBLAZE@ @HAVE_BPF@ @HAVE_HW_TIMESTAMP@ @HAVE_NT@ @HAVE_MLX@ @HAVE_NPCAP@ @HAVE_DL_REDIS@
+CFLAGS += ${CFLAGS_MIN} @HAVE_PF_RING_FT@ 
+
+EXTRA_DEPS_MIN = extract_nbpf @PF_RING_ZC_DEP@ @AF_XDP_DEP@ @NT_DEP@ @MLX_DEP@ @FIBERBLAZE_DEP@ @NPCAP_DEP@
+EXTRA_DEPS =     ${EXTRA_DEPS_MIN} @PF_RING_FT_DEP@
+
+LDFLAGS   += -g -shared
+SYSLIBS   = -lpthread @SYSLIBS@ @AF_XDP_LIB@ @FIBERBLAZE_LIB@
+
+# How to make an object file
+%.o: %.c %.h Makefile
+#	@echo "=*= making object $@ =*="
+	${CC} ${CFLAGS} -c $< -o $@
+
+#
+# Main targets
+#
+STATICLIB  = libpfring.a
+DYNAMICLIB = libpfring.so
+DYNAMICLIB_MIN = libpfring_min.so
+TARGETS    = ${STATICLIB} ${DYNAMICLIB} ${DYNAMICLIB_MIN}
+RING_H     = $(PF_RING_KERNEL)/linux/pf_ring.h
+AR ?= ar
+RANLIB ?= ranlib
+
+all: ${TARGETS}
+
+${STATICLIB}: Makefile ${EXTRA_DEPS} ${OBJS} pfring.h ${RING_H}
+	@echo "=*= making library $@ =*="
+	$(AR) rs $@ ${OBJS} ${NBPF_OBJS}
+	$(RANLIB) $@
+
+${DYNAMICLIB}: Makefile ${EXTRA_DEPS} ${OBJS} pfring.h ${RING_H}
+	@echo "=*= making library $@ =*="
+	${CC} -Wl,-soname,$@.@MAJOR_VER@ ${LDFLAGS} ${OBJS} ${NBPF_OBJS} ${SYSLIBS} -o $@.@VER@
+
+${DYNAMICLIB_MIN}: Makefile ${EXTRA_DEPS_MIN} ${OBJS_MIN} pfring.h ${RING_H}
+	@echo "=*= making library $@ =*="
+	${CC} -Wl,-soname,$@.@MAJOR_VER@ ${LDFLAGS} ${OBJS_MIN} ${NBPF_OBJS} ${SYSLIBS} -o $@.@VER@
+
+extract_pfring_zc_lib:
+	@AR_X@ @PF_RING_ZC_LIB@
+
+extract_pfring_ft_lib:
+	@AR_X@ @PF_RING_FT_LIB@
+
+extract_nt_lib:
+	@AR_X@ @MOD_NT_LIB@
+
+extract_mlx_lib:
+	@AR_X@ @MOD_MLX_LIB@
+
+extract_fiberblaze_lib:
+	@AR_X@ @MOD_FIBERBLAZE_LIB@
+
+extract_npcap_lib:
+	@AR_X@ @NPCAP_LIB@
+
+extract_nbpf: ${NBPF_LIB}
+	$(AR) x ${NBPF_LIB}
+	cp ${NBPF_HDR} .
+
+copy_if_xdp:
+	cp /usr/src/linux-headers-$(BUILD_KERNEL)/include/uapi/linux/if_xdp.h $(PF_RING_KERNEL)/linux/
+
+${NBPF_LIB}:
+	$(MAKE) -C ../nbpf
+
+install: install-static install-shared
+
+install-includes:
+	mkdir -p $(DESTDIR)$(includedir)
+	cp pfring.h pfring_mod_pcap.h @PF_RING_ZC_H@ @PF_RING_FT_H@ @NPCAP_H@ ${NBPF_HDR} $(DESTDIR)$(includedir)/
+
+install-static: ${STATICLIB} install-includes
+	mkdir -p $(DESTDIR)$(libdir)
+	cp ${STATICLIB} $(DESTDIR)$(libdir)/
+
+install-shared:	${DYNAMICLIB} ${DYNAMICLIB_MIN} install-includes
+	mkdir -p $(DESTDIR)$(libdir)
+	cp ${DYNAMICLIB}.@VER@ $(DESTDIR)$(libdir)/
+	cd $(DESTDIR)$(libdir); ln -sf ${DYNAMICLIB}.@VER@ ${DYNAMICLIB}.@MAJOR_VER@
+	cd $(DESTDIR)$(libdir); ln -sf ${DYNAMICLIB}.@MAJOR_VER@ ${DYNAMICLIB}
+	cp ${DYNAMICLIB_MIN}.@VER@ $(DESTDIR)$(libdir)/
+	cd $(DESTDIR)$(libdir); ln -sf ${DYNAMICLIB_MIN}.@VER@ ${DYNAMICLIB_MIN}.@MAJOR_VER@
+	cd $(DESTDIR)$(libdir); ln -sf ${DYNAMICLIB_MIN}.@MAJOR_VER@ ${DYNAMICLIB_MIN}
+	-@if test "$(USER)" = "root"; then \
+		ldconfig; \
+	fi
+
+clean:
+	@rm -f ${TARGETS} *.o *~

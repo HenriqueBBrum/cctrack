@@ -1,0 +1,41 @@
+all: install
+
+add: veryclean
+	\/bin/rm -rf /usr/src/@IXGBE@-zc-@IXGBE_VERSION@.@REVISION@
+	mkdir /usr/src/@IXGBE@-zc-@IXGBE_VERSION@.@REVISION@
+	cd @IXGBE@/@IXGBE@-@IXGBE_VERSION@-zc/src ; make clean; cp -r * /usr/src/@IXGBE@-zc-@IXGBE_VERSION@.@REVISION@
+	cp ../../kernel/linux/pf_ring.h /usr/src/@IXGBE@-zc-@IXGBE_VERSION@.@REVISION@
+	sed -i -e 's/ixgbe\.o/ixgbe_zc.o/' -e 's/ixgbe-/ixgbe_zc-/' /usr/src/@IXGBE@-zc-@IXGBE_VERSION@.@REVISION@/Kbuild
+	mv /usr/src/@IXGBE@-zc-@IXGBE_VERSION@.@REVISION@/Kbuild /usr/src/@IXGBE@-zc-@IXGBE_VERSION@.@REVISION@/Makefile
+	sed -i '1iPF_RING_PATH=\/usr\/src\/pfring-@PF_RING_VERSION@.@REVISION@' /usr/src/@IXGBE@-zc-@IXGBE_VERSION@.@REVISION@/Makefile
+	sed -i -e 's/#HAVE_PF_RING_DKMS //' /usr/src/@IXGBE@-zc-@IXGBE_VERSION@.@REVISION@/common.mk
+	cp dkms.conf.@IXGBE@ /usr/src/@IXGBE@-zc-@IXGBE_VERSION@.@REVISION@/dkms.conf 
+	dkms add -m @IXGBE@-zc -v @IXGBE_VERSION@.@REVISION@
+
+build: add
+	dkms build -m @IXGBE@-zc -v @IXGBE_VERSION@.@REVISION@
+
+install: build
+	dkms install --force -m @IXGBE@-zc -v @IXGBE_VERSION@.@REVISION@
+
+deb: add add_deb install
+	dkms mkdeb -m @IXGBE@-zc -v @IXGBE_VERSION@.@REVISION@ --source-only
+
+rpm: add add_rpm install
+	dkms mkrpm -m @IXGBE@-zc -v @IXGBE_VERSION@.@REVISION@ --source-only
+
+add_rpm:
+	cp -f zc.spec /usr/src/@IXGBE@-zc-@IXGBE_VERSION@.@REVISION@/@IXGBE@-zc-dkms-mkrpm.spec
+
+add_deb:
+	cp -r zc-dkms-mkdeb /usr/src/@IXGBE@-zc-@IXGBE_VERSION@.@REVISION@/@IXGBE@-zc-dkms-mkdeb
+
+remove:
+	-dkms remove -m @IXGBE@-zc -v @IXGBE_VERSION@.@REVISION@ --all
+	\/bin/rm -f /lib/modules/*/weak-updates/ixgbe*ko
+	\/bin/rm -f /lib/modules/*/extra/ixgbe*ko
+	\/bin/rm -rf /var/lib/dkms/ixgbe-zc
+
+veryclean: remove
+	\/bin/rm -fr /usr/src/@IXGBE@-zc-@IXGBE_VERSION@.@REVISION@
+	

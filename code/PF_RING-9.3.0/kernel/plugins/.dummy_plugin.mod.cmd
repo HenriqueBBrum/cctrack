@@ -1,0 +1,1 @@
+savedcmd_/home/hbeckerbrum/installed_from_source/cctrack/kernel/plugins/dummy_plugin.mod := printf '%s\n'   dummy_plugin.o | awk '!x[$$0]++ { print("/home/hbeckerbrum/installed_from_source/cctrack/kernel/plugins/"$$0) }' > /home/hbeckerbrum/installed_from_source/cctrack/kernel/plugins/dummy_plugin.mod
